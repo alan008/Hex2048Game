@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101719">
+  <title>Гексаполе</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #101719;
+      --panel: #161f21;
+      --line: #2a383b;
+      --text: #f1ede3;
+      --muted: #a1afae;
+      --amber: #ffb663;
+      --mint: #71e0cd;
+      --hexagon: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+      font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      min-width: 280px;
+      min-height: 100vh;
+      margin: 0;
+      background: radial-gradient(ellipse at 27% 3%, #213034 0%, transparent 56%), var(--page);
+      color: var(--text);
+    }
+
+    button, select { font: inherit; }
+    button:focus-visible, select:focus-visible { outline: 2px solid var(--mint); outline-offset: 4px; }
+    .game { width: min(1056px, calc(100% - 64px)); margin: auto; padding: 42px 0 40px; }
+    .masthead { display: flex; flex-wrap: wrap; align-items: center; gap: 17px; margin-bottom: 25px; }
+    .brand-mark { width: 46px; height: 51px; flex: 0 0 46px; position: relative; }
+    .brand-mark::before, .brand-mark::after, .brand-mark span {
+      content: ""; position: absolute; width: 21px; height: 24px; clip-path: var(--hexagon);
+    }
+    .brand-mark::before { left: 2px; top: 13px; background: linear-gradient(145deg, #ffd28c, #b76530); }
+    .brand-mark::after { left: 22px; top: 2px; background: linear-gradient(145deg, #96f6e2, #328579); }
+    .brand-mark span { left: 22px; top: 25px; background: #3c5254; }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: clamp(2.2rem, 5vw, 4rem); line-height: 1; letter-spacing: -.075em; }
+    h2 { font-size: 1rem; letter-spacing: .01em; }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+    }
+    .variants {
+      display: flex; gap: 4px; min-width: 0; margin: 0 0 0 auto; padding: 4px;
+      border: 1px solid var(--line); border-radius: 13px; background: #121c1e;
+    }
+    .variants label { position: relative; }
+    .variants span {
+      display: grid; place-items: center; min-height: 39px; padding: 7px 10px;
+      border: 1px solid transparent; border-radius: 9px; color: #bbc9c7;
+      font-size: .875rem; font-weight: 700; text-align: center; cursor: pointer;
+    }
+    .variants label:hover span { background: #1d2b2e; }
+    .variants input:checked + span { border-color: #456963; background: #294340; color: #e4f9f1; }
+    .variants input:focus-visible + span { outline: 2px solid var(--mint); outline-offset: 2px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 306px; gap: 16px; align-items: start; }
+    .surface { border: 1px solid var(--line); border-radius: 20px; background: var(--panel); }
+
+    .arena {
+      min-width: 0;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 32% 38%, #223337, transparent 65%), #151f21;
+      box-shadow: 0 14px 40px #080d0e50;
+    }
+
+    .arena-header {
+      min-height: 75px;
+      padding: 14px 23px;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      border-bottom: 1px solid #344549aa;
+      background: #111a1cb3;
+    }
+
+    .turn-symbol {
+      width: 19px; height: 22px; flex: 0 0 19px;
+      clip-path: var(--hexagon); background: var(--neutral, #a1afae);
+    }
+    [data-player="1"] { --accent: var(--amber); --glow: #ffb66338; }
+    [data-player="2"] { --accent: var(--mint); --glow: #71e0cd38; }
+    .turn-symbol[data-player] { background: var(--accent); }
+    .turn-title { display: block; font-weight: 750; }
+    .turn-detail { display: block; color: var(--muted); font-size: .875rem; }
+    .round-count {
+      flex-shrink: 0; margin-left: auto; padding: 5px 8px;
+      border: 1px solid var(--line); border-radius: 7px;
+      color: var(--muted); font-size: .875rem; font-variant-numeric: tabular-nums;
+    }
+
+    .field { padding: 14px 21px; }
+    .board {
+      --tile-width: 10.39%; --tile-height: 13.38%;
+      width: min(100%, 560px); aspect-ratio: 9.4 / 8.43;
+      position: relative; margin: auto; container-type: inline-size;
+    }
+    .board::before {
+      content: ""; position: absolute; inset: 6%;
+      background: radial-gradient(ellipse, #80b7ba0d, transparent 70%);
+      pointer-events: none;
+    }
+
+    .tile {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: var(--tile-width); height: var(--tile-height);
+      padding: 0; border: 0;
+      transform: translate(-50%, -50%);
+      clip-path: var(--hexagon);
+      background: #3a4e51;
+      color: inherit;
+      cursor: default;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tile::before {
+      content: ""; position: absolute; inset: 1px;
+      clip-path: var(--hexagon);
+      background: linear-gradient(155deg, #2a393d, #223034);
+    }
+    .tile:focus-visible { outline: none; background: #f4f9ed; z-index: 1; }
+    .tile:focus-visible::before { inset: 3px; }
+    .tile[data-playable], .tile[data-move] { cursor: pointer; }
+    .tile[data-playable]:hover, .tile[aria-pressed="true"] { background: var(--accent); }
+    .tile[aria-pressed="true"]::before { inset: 2px; background: var(--glow); }
+    .tile[data-move] { background: var(--accent); }
+    .tile[data-move]::before { background: #263739; }
+    .tile[data-move="jump"] { background: color-mix(in srgb, var(--accent) 47%, #3a4e51); }
+    .tile[data-move="merge"] { background: #f6eac0; }
+    .tile[data-move="merge"]::before { inset: 2px; background: var(--glow); }
+    .tile[data-move]:hover::before { background: #415557; }
+    .tile[data-move]:focus-visible { background: #f4f9ed; }
+
+    .gem {
+      width: 72%; height: 73%; position: relative; display: block;
+      clip-path: var(--hexagon);
+      background: linear-gradient(145deg, var(--gem-light), var(--gem-dark));
+      opacity: 0;
+      pointer-events: none;
+    }
+    .gem::before, .gem::after { content: ""; position: absolute; }
+    .gem::before { inset: 10% 13%; clip-path: var(--hexagon); background: linear-gradient(150deg, var(--gem-top), var(--gem-mid) 53%, var(--gem-dark)); }
+    .gem::after { inset: 0; clip-path: polygon(50% 0, 100% 25%, 88% 31%, 50% 13%, 12% 31%, 0 25%); background: #ffffff67; }
+    [data-piece="1"] { --gem-light: #ffdba0; --gem-top: #ffe0a0; --gem-mid: #f8a353; --gem-dark: #a65027; }
+    [data-piece="2"] { --gem-light: #b1f9e8; --gem-top: #b8ffea; --gem-mid: #59c9b8; --gem-dark: #246d69; }
+    [data-piece] > .gem, .gem[data-piece] { opacity: 1; }
+    .tile .gem, .effect-cell .gem { display: grid; place-items: center; }
+    .tile[data-in-flight] > .gem { visibility: hidden; }
+    .move-effects, .capture-lightning { position: absolute; inset: 0; pointer-events: none; }
+    .move-effects { z-index: 2; }
+    .capture-lightning { width: 100%; height: 100%; }
+    .effect-cell {
+      position: absolute; display: grid; place-items: center;
+      width: var(--tile-width); height: var(--tile-height);
+      transform: translate(-50%, -50%);
+    }
+    .tile-value {
+      position: relative; z-index: 1; color: #172725;
+      font-size: .875rem; font-size: clamp(.6875rem, 4cqi, 1.375rem);
+      font-weight: 850; font-variant-numeric: tabular-nums; line-height: 1;
+    }
+    .move-mark { width: 23%; aspect-ratio: 1; position: absolute; display: none; border-radius: 50%; }
+    [data-move] > .move-mark { display: block; }
+    [data-move="copy"] > .move-mark { background: var(--accent); box-shadow: 0 0 12px var(--glow); }
+    [data-move="jump"] > .move-mark { border: 2px solid var(--accent); }
+    [data-move="merge"] > .move-mark {
+      right: 10%; bottom: 20%; width: 27%; max-width: 18px;
+      background: #f6eac0; color: #172725; pointer-events: none;
+    }
+    [data-move="merge"] > .move-mark::before, .legend .merge-mark::before {
+      content: "+"; position: absolute; inset: 0; display: grid; place-items: center;
+      font: 800 clamp(.55rem, 2.6cqi, .875rem)/1 system-ui, sans-serif;
+    }
+    .tile[data-last]::after {
+      content: ""; position: absolute; width: 9%; aspect-ratio: 1;
+      border-radius: 50%; bottom: 5%; background: #fff5df;
+    }
+
+    .legend {
+      min-height: 49px; padding: 11px 18px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px 25px;
+      border-top: 1px solid #344549aa;
+      color: #b9c7c6; font-size: .875rem;
+    }
+    .legend > span:not([hidden]) { display: inline-flex; align-items: center; gap: 8px; }
+    .legend i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; color: var(--accent, #c3d1cf); }
+    .legend .ring { background: transparent; border: 2px solid currentColor; }
+    .legend .merge-mark { position: relative; width: 12px; height: 12px; background: #f6eac0; color: #172725; }
+    .legend .merge-mark::before { font-size: .6875rem; }
+
+    .sidebar { display: grid; gap: 16px; }
+    .card { padding: 19px; }
+    .card h2 { margin-bottom: 12px; }
+    .player {
+      display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 10px;
+      min-height: 53px; padding: 6px 11px;
+      border: 1px solid transparent; border-radius: 10px;
+    }
+    .player[data-active] { background: var(--glow); border-color: var(--glow); }
+    .player .gem { width: 21px; height: 24px; }
+    .player .name { font-size: .9375rem; }
+    .score { font-size: 1.45rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent); }
+    .balance { height: 5px; display: flex; overflow: hidden; margin: 13px 0 8px; border-radius: 20px; background: #324347; }
+    .balance span { background: var(--accent); width: 0; transition: width .24s ease-out; }
+    .empty { font-size: .875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    .controls { display: grid; gap: 9px; }
+    .controls label { font-weight: 700; }
+    .select-wrap { position: relative; }
+    .select-wrap::after {
+      content: ""; pointer-events: none; position: absolute; right: 15px; top: calc(50% - 5px);
+      width: 8px; height: 8px; border: solid #b8c7c6; border-width: 0 2px 2px 0; transform: rotate(45deg);
+    }
+    select, .restart { width: 100%; min-height: 43px; border-radius: 9px; }
+    select { appearance: none; border: 1px solid #415355; padding: 8px 30px 8px 11px; background: #1c292b; color: var(--text); cursor: pointer; }
+    .restart { border: 1px solid #5d8d86; background: #bcebdd; color: #102b27; font-weight: 750; cursor: pointer; }
+    .restart:hover { background: #d5f7ec; }
+    .restart:active { background: #a2d9cb; }
+    .rules p { font-size: .9rem; line-height: 1.55; color: #bcc9c8; }
+    .rules p + p { margin-top: 9px; }
+
+    @media (min-width: 681px) and (max-width: 850px) {
+      .game { width: calc(100% - 42px); }
+      .layout { grid-template-columns: minmax(0, 1fr) 238px; }
+      .card { padding: 14px; }
+      .field { padding-inline: 12px; }
+    }
+    @media (max-width: 680px) {
+      .game { width: calc(100% - 24px); padding: 20px 0 24px; }
+      .masthead { margin: 0 3px 16px; gap: 9px; }
+      .variants { flex-basis: 100%; }
+      .variants label { flex: 1 1 auto; }
+      .layout, .sidebar { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+      .sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .rules { grid-column: 1 / -1; }
+      .surface { border-radius: 15px; }
+      .arena-header { gap: 9px; padding: 9px 12px; min-height: 65px; }
+      .field { padding: 9px 5px; }
+      .legend { min-height: 43px; padding: 7px 8px; gap: 5px 16px; }
+      .card { padding: 12px; }
+      .player { padding-inline: 5px; gap: 4px; grid-template-columns: 20px 1fr auto; }
+      .player .gem { width: 17px; height: 20px; }
+    }
+    @media (max-width: 360px) {
+      .sidebar { grid-template-columns: minmax(0, 1fr); }
+      .round-count { padding-inline: 5px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <header class="masthead">
+      <div class="brand-mark" aria-hidden="true"><span></span></div>
+      <h1>Гексаполе</h1>
+      <fieldset id="variants" class="variants">
+        <legend class="visually-hidden">Вариант игры</legend>
+        <label><input class="visually-hidden" type="radio" name="variant" value="classic" checked><span>Классика</span></label>
+        <label><input class="visually-hidden" type="radio" name="variant" value="duel"><span>Дуэль со слиянием</span></label>
+      </fieldset>
+    </header>
+    <div class="layout">
+      <section class="surface arena" aria-label="Игровое поле">
+        <div class="arena-header">
+          <span id="turn-symbol" class="turn-symbol" aria-hidden="true"></span>
+          <div role="status" aria-atomic="true">
+            <strong id="turn-title" class="turn-title"></strong>
+            <span id="turn-detail" class="turn-detail"></span>
+          </div>
+          <p id="round-count" class="round-count" hidden></p>
+        </div>
+        <div class="field"><div id="board" class="board" role="group" aria-label="Клетки игрового поля"></div></div>
+        <div id="legend" class="legend" aria-label="Подсказки ходов">
+          <span><i aria-hidden="true"></i> Копия на 1 клетку</span>
+          <span><i class="ring" aria-hidden="true"></i><span id="jump-label">Прыжок на 2 клетки</span></span>
+          <span id="merge-legend" hidden><i class="merge-mark" aria-hidden="true"></i> Слияние</span>
+        </div>
+      </section>
+      <aside class="sidebar" aria-label="Счёт и настройки">
+        <section class="surface card" aria-labelledby="score-heading">
+          <h2 id="score-heading">Счёт</h2>
+          <div id="amber-player" class="player" data-player="1">
+            <span class="gem" data-piece="1" aria-hidden="true"></span>
+            <span class="name">Янтарь</span>
+            <strong id="amber-score" class="score"></strong>
+          </div>
+          <div id="mint-player" class="player" data-player="2">
+            <span class="gem" data-piece="2" aria-hidden="true"></span>
+            <span class="name">Нефрит</span>
+            <strong id="mint-score" class="score"></strong>
+          </div>
+          <div class="balance" aria-hidden="true"><span data-player="1"></span><span data-player="2"></span></div>
+          <p id="empty-count" class="empty"></p>
+        </section>
+        <section class="surface card controls" aria-labelledby="mode-label">
+          <label id="mode-label" for="mode">Игроки</label>
+          <div class="select-wrap">
+            <select id="mode">
+              <option value="computer">Компьютер</option>
+              <option value="local">На двоих</option>
+            </select>
+          </div>
+          <button id="restart" class="restart" type="button">Новая партия</button>
+        </section>
+        <section class="surface card rules" aria-labelledby="rules-heading">
+          <h2 id="rules-heading">Как играть</h2>
+          <div id="classic-rules">
+            <p>Выбери свою фишку и свободную клетку. На соседней клетке появится копия. При прыжке исходная клетка освободится.</p>
+            <p>Фишки соперника рядом с клеткой приземления станут твоими. Если ходов нет, ход переходит сопернику. Побеждает тот, у кого к концу партии больше фишек.</p>
+          </div>
+          <div id="duel-rules" hidden>
+            <p>Копия на соседней клетке всегда получает 2. Прыжок сохраняет число фишки. Двойка прыгает на 2 клетки, четвёрка — на 2–3, восьмёрка — на 2–4. Каждое удвоение увеличивает предельную дальность на клетку.</p>
+            <p>Чтобы слить две соседние свои фишки с одинаковым числом, выбери первую и нажми на вторую. Вторая удвоится, клетка первой освободится.</p>
+            <p>Фишка в клетке назначения захватывает соседей соперника с таким же или меньшим числом. Партия длится до 30 раундов. Побеждает тот, кто занял больше клеток.</p>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+  <script>
+    'use strict';
+
+    const AMBER = 1;
+    const MINT = 2;
+    const RADIUS = 4;
+    const BASE_VALUE = 2;
+    const DUEL_ROUNDS = 30;
+    const DUEL_TURNS = DUEL_ROUNDS * 2;
+    const playerNames = ['', 'Янтарь', 'Нефрит'];
+    const moveNames = { copy: 'копирование', jump: 'прыжок', merge: 'слияние' };
+    const holes = new Set(['0,0', '1,-3', '2,1', '-3,2']);
+    const opening = [[], [[0, -4], [4, 0], [-4, 4]], [[4, -4], [0, 4], [-4, 0]]];
+    const board = document.querySelector('#board');
+    const variants = document.querySelector('#variants');
+    const mode = document.querySelector('#mode');
+    const turnSymbol = document.querySelector('#turn-symbol');
+    const turnTitle = document.querySelector('#turn-title');
+    const turnDetail = document.querySelector('#turn-detail');
+    const roundCount = document.querySelector('#round-count');
+    const legend = document.querySelector('#legend');
+    const jumpLabel = document.querySelector('#jump-label');
+    const mergeLegend = document.querySelector('#merge-legend');
+    const classicRules = document.querySelector('#classic-rules');
+    const duelRules = document.querySelector('#duel-rules');
+    const scoreNumbers = [null, document.querySelector('#amber-score'), document.querySelector('#mint-score')];
+    const scoreRows = [null, document.querySelector('#amber-player'), document.querySelector('#mint-player')];
+    const balance = document.querySelectorAll('.balance span');
+    const emptyCount = document.querySelector('#empty-count');
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+    const cells = [];
+    const indexByCoordinate = new Map();
+    for (let r = -RADIUS; r <= RADIUS; r += 1) {
+      for (let q = -RADIUS; q <= RADIUS; q += 1) {
+        const key = `${q},${r}`;
+        if (Math.abs(q + r) > RADIUS || holes.has(key)) continue;
+        const tile = document.createElement('button');
+        const index = cells.length;
+        const x = q + r / 2;
+        tile.type = 'button';
+        tile.className = 'tile';
+        tile.dataset.index = index;
+        tile.style.left = `${50 + x * 100 / 9.4}%`;
+        tile.style.top = `${50 + r * Math.sqrt(3) * 50 / 8.43}%`;
+        tile.innerHTML = '<span class="gem" aria-hidden="true"><span class="tile-value"></span></span><span class="move-mark" aria-hidden="true"></span>';
+        const gem = tile.firstElementChild;
+        const tileValue = gem.firstElementChild;
+        board.append(tile);
+        indexByCoordinate.set(key, index);
+        cells.push({ q, r, x, index, tile, gem, tileValue, neighbors: [], moves: [] });
+      }
+    }
+
+    for (const cell of cells) {
+      for (const other of cells) {
+        const dq = cell.q - other.q;
+        const dr = cell.r - other.r;
+        const distance = Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr));
+        if (distance === 1) cell.neighbors.push(other.index);
+        if (distance > 0) cell.moves.push({ from: cell.index, to: other.index, distance });
+      }
+    }
+
+    let duel;
+    let position;
+    let turn;
+    let selected;
+    let focused;
+    let lastMove;
+    let aiTimer;
+    let activeMove = null;
+
+    function maxJumpDistance(value) {
+      return duel ? Math.log2(value) + 1 : 2;
+    }
+
+    function getMoveKind(state, { from, to, distance }) {
+      const source = state[from];
+      const target = state[to];
+      if (!target) {
+        if (distance === 1) return 'copy';
+        return distance <= maxJumpDistance(source.value) ? 'jump' : null;
+      }
+      if (duel && distance === 1 && target.side === source.side && target.value === source.value) return 'merge';
+      return null;
+    }
+
+    function canMoveFrom(state, cell) {
+      return cell.moves.some(move => getMoveKind(state, move));
+    }
+
+    function canMove(state, side) {
+      return cells.some(cell => state[cell.index]?.side === side && canMoveFrom(state, cell));
+    }
+
+    function legalMoves(state, side) {
+      const moves = [];
+      for (const cell of cells) {
+        if (state[cell.index]?.side !== side) continue;
+        for (const move of cell.moves) {
+          const kind = getMoveKind(state, move);
+          if (kind) moves.push({ ...move, kind });
+        }
+      }
+      return moves;
+    }
+
+    function countPieces(state) {
+      const count = [0, 0, 0];
+      for (const piece of state) count[piece?.side ?? 0] += 1;
+      return count;
+    }
+
+    function applyMove(state, move) {
+      const source = state[move.from];
+      const side = source.side;
+      let value = source.value;
+      if (move.kind === 'copy') value = BASE_VALUE;
+      else state[move.from] = null;
+      if (move.kind === 'merge') value *= 2;
+      state[move.to] = { side, value };
+
+      const captured = [];
+      for (const index of cells[move.to].neighbors) {
+        const target = state[index];
+        if (target?.side === 3 - side && target.value <= value) {
+          state[index] = { side, value: target.value };
+          captured.push(index);
+        }
+      }
+      return captured;
+    }
+
+    function advanceTurn(state, side, used) {
+      const count = countPieces(state);
+      const opponent = 3 - side;
+      if (!count[opponent] || (!duel && !count[0])) return { side, used, end: 'board' };
+      if (duel && used >= DUEL_TURNS) return { side, used, end: 'limit' };
+      if (canMove(state, opponent)) return { side: opponent, used };
+      if (!canMove(state, side)) return { side, used, end: 'board' };
+
+      used += 1;
+      if (duel && used >= DUEL_TURNS) return { side, used, end: 'limit' };
+      return { side, used, passed: opponent };
+    }
+
+    function isComputerTurn() {
+      return !turn.end && turn.side === MINT && mode.value === 'computer';
+    }
+
+    function startGame() {
+      clearTimeout(aiTimer);
+      activeMove?.abort();
+      activeMove = null;
+      duel = variants.querySelector(':checked').value === 'duel';
+      position = Array(cells.length).fill(null);
+      for (const side of [AMBER, MINT]) {
+        for (const [q, r] of opening[side]) {
+          position[indexByCoordinate.get(`${q},${r}`)] = { side, value: BASE_VALUE };
+        }
+      }
+      turn = { side: AMBER, used: 0 };
+      selected = null;
+      focused = indexByCoordinate.get('0,-4');
+      lastMove = null;
+      roundCount.hidden = !duel;
+      mergeLegend.hidden = !duel;
+      classicRules.hidden = duel;
+      duelRules.hidden = !duel;
+      render();
+    }
+
+    async function play(move) {
+      const nextPosition = position.slice();
+      const captured = applyMove(nextPosition, move);
+      selected = null;
+      if (!reducedMotion.matches && typeof board.animate === 'function') {
+        const controller = new AbortController();
+        activeMove = controller;
+        lastMove = null;
+        render();
+
+        try {
+          await animateMove(move, nextPosition, captured, controller.signal);
+        } catch (error) {
+          if (!controller.signal.aborted) console.warn('Не удалось показать анимацию хода.', error);
+        }
+        if (activeMove !== controller) return;
+        activeMove = null;
+      }
+
+      position = nextPosition;
+      lastMove = { to: move.to, captured };
+      turn = advanceTurn(position, turn.side, turn.used + 1);
+
+      render();
+      if (isComputerTurn()) aiTimer = setTimeout(playComputer, 420);
+    }
+
+    function evaluate(state, end) {
+      const [, amber, mint] = countPieces(state);
+      const difference = mint - amber;
+      if (end) return 1000 * Math.sign(difference) + difference;
+      let activity = 0;
+      let strength = 0;
+      for (const cell of cells) {
+        const piece = state[cell.index];
+        if (!piece) continue;
+        const sign = piece.side === MINT ? 1 : -1;
+        if (canMoveFrom(state, cell)) activity += sign;
+        strength += sign * (piece.value - BASE_VALUE);
+      }
+      return difference * 12 + strength * 5 + activity;
+    }
+
+    function playComputer() {
+      if (activeMove || !isComputerTurn()) return;
+      const candidates = legalMoves(position, MINT).map(move => {
+        const state = position.slice();
+        applyMove(state, move);
+        const next = advanceTurn(state, MINT, turn.used + 1);
+        return { move, state, next, value: evaluate(state, next.end) };
+      });
+      candidates.sort((a, b) => b.value - a.value);
+
+      let best = candidates[0];
+      let bestScore = -Infinity;
+      for (const candidate of candidates.slice(0, 14)) {
+        let score = candidate.value;
+        if (!candidate.next.end && candidate.next.side === AMBER) {
+          score = Infinity;
+          for (const reply of legalMoves(candidate.state, AMBER)) {
+            const answer = candidate.state.slice();
+            applyMove(answer, reply);
+            const next = advanceTurn(answer, AMBER, candidate.next.used + 1);
+            score = Math.min(score, evaluate(answer, next.end));
+            if (score <= bestScore) break;
+          }
+        }
+        if (score > bestScore) {
+          best = candidate;
+          bestScore = score;
+        }
+      }
+
+      play(best.move);
+    }
+
+    function renderPiece({ tile, tileValue }, piece) {
+      if (piece) tile.dataset.piece = piece.side;
+      else delete tile.dataset.piece;
+      tileValue.textContent = duel && piece ? piece.value : '';
+    }
+
+    function render() {
+      const count = countPieces(position);
+      const { side: player, used, end, passed } = turn;
+      const canAct = !activeMove && !end && !isComputerTurn();
+      board.setAttribute('aria-busy', String(Boolean(activeMove)));
+      const available = new Map();
+      if (canAct && selected !== null) {
+        for (const move of cells[selected].moves) {
+          const kind = getMoveKind(position, move);
+          if (kind) available.set(move.to, { kind, distance: move.distance });
+        }
+      }
+      const range = selected === null ? null : maxJumpDistance(position[selected].value);
+      if (!duel || range === 2) jumpLabel.textContent = 'Прыжок на 2 клетки';
+      else jumpLabel.textContent = range === null ? 'Прыжок' : `Прыжок до ${range} клеток`;
+
+      for (const cell of cells) {
+        const { index, tile } = cell;
+        const piece = position[index];
+        const move = available.get(index);
+        const kind = move?.kind;
+        const playable = canAct && !kind && piece?.side === player && canMoveFrom(position, cell);
+        const labels = [piece ? playerNames[piece.side] : 'Свободная клетка'];
+        if (duel && piece) labels.push(`число ${piece.value}`);
+        if (kind) labels.push(moveNames[kind]);
+        if (duel && kind === 'jump') labels.push(`расстояние ${move.distance}`);
+        if (kind === 'merge') labels.push(`результат ${piece.value * 2}`);
+        if (playable && index !== selected) labels.push('можно выбрать');
+        if (lastMove?.to === index) labels.push('последний ход');
+        labels.push(`ряд ${cell.r + RADIUS + 1}, позиция ${cell.q + RADIUS + 1}`);
+
+        renderPiece(cell, piece);
+        if (kind) tile.dataset.move = kind;
+        else delete tile.dataset.move;
+        tile.dataset.player = player;
+        tile.toggleAttribute('data-playable', playable);
+        tile.toggleAttribute('data-last', lastMove?.to === index);
+        tile.setAttribute('aria-label', labels.join(', '));
+        if (playable) tile.setAttribute('aria-pressed', String(index === selected));
+        else tile.removeAttribute('aria-pressed');
+        tile.tabIndex = index === focused ? 0 : -1;
+      }
+
+      for (const side of [AMBER, MINT]) {
+        scoreNumbers[side].textContent = count[side];
+        scoreRows[side].toggleAttribute('data-active', !end && side === player);
+        balance[side - 1].style.width = `${count[side] * 100 / cells.length}%`;
+      }
+      emptyCount.textContent = `Свободных клеток: ${count[0]}`;
+      if (duel) {
+        const round = end ? Math.ceil(used / 2) : Math.floor(used / 2) + 1;
+        roundCount.textContent = `Раунд ${round} / ${DUEL_ROUNDS}`;
+      }
+
+      const winner = count[AMBER] === count[MINT] ? 0 : count[AMBER] > count[MINT] ? AMBER : MINT;
+      const tone = end ? winner : player;
+      for (const element of [turnSymbol, legend]) {
+        if (tone) element.dataset.player = tone;
+        else delete element.dataset.player;
+      }
+
+      if (end) {
+        turnTitle.textContent = winner ? `Победа: ${playerNames[winner]}` : 'Ничья';
+        const score = `Итоговый счёт: ${count[AMBER]} : ${count[MINT]}`;
+        turnDetail.textContent = end === 'limit' ? `Лимит ходов. ${score}` : score;
+        return;
+      }
+
+      turnTitle.textContent = isComputerTurn() ? 'Ход компьютера' : `Ход: ${playerNames[player]}`;
+      let instruction = 'Выбери фишку.';
+      if (selected !== null) {
+        instruction = duel ? 'Выбери подсвеченную клетку.' : 'Выбери клетку назначения.';
+      }
+      if (isComputerTurn()) instruction = 'Компьютер думает…';
+      if (activeMove) instruction = 'Ход выполняется…';
+      turnDetail.textContent = passed ? `${playerNames[passed]} пропускает ход. ${instruction}` : instruction;
+    }
+
+    function animateEffect(element, frames, duration, signal, easing = 'ease-out') {
+      const animation = element.animate(frames, { duration, easing, fill: 'both' });
+      const cancel = () => animation.cancel();
+      signal.addEventListener('abort', cancel, { once: true });
+      return animation.finished.catch(error => {
+        if (!signal.aborted) throw error;
+      }).finally(() => {
+        signal.removeEventListener('abort', cancel);
+        cancel();
+      });
+    }
+
+    async function animateMove(move, nextPosition, captured, signal) {
+      const from = cells[move.from];
+      const to = cells[move.to];
+      const copy = move.kind === 'copy';
+      const start = { left: from.tile.style.left, top: from.tile.style.top };
+      const finish = { left: to.tile.style.left, top: to.tile.style.top };
+      const piece = copy ? nextPosition[move.to] : position[move.from];
+
+      const layer = document.createElement('div');
+      layer.className = 'move-effects';
+      layer.setAttribute('aria-hidden', 'true');
+
+      const mover = document.createElement('div');
+      mover.className = 'effect-cell';
+      Object.assign(mover.style, start);
+      const gem = from.gem.cloneNode(true);
+      gem.dataset.piece = piece.side;
+      gem.firstElementChild.textContent = duel ? piece.value : '';
+      mover.append(gem);
+      layer.append(mover);
+      board.append(layer);
+
+      const cleanup = () => {
+        layer.remove();
+        from.tile.removeAttribute('data-in-flight');
+      };
+      signal.addEventListener('abort', cleanup, { once: true });
+      try {
+        if (!copy) from.tile.setAttribute('data-in-flight', '');
+        const duration = copy ? 330 : 240 + 28 * move.distance;
+        const slide = animateEffect(mover, copy ? [
+          { ...start, transform: 'translate(-50%, -50%) scale(.22)', opacity: 0 },
+          { offset: .22, transform: 'translate(-50%, -50%) scale(.48)', opacity: .94 },
+          { offset: .78, transform: 'translate(-50%, -50%) scale(1.07)', opacity: 1 },
+          { ...finish, transform: 'translate(-50%, -50%) scale(1)', opacity: 1 }
+        ] : [
+          { ...start, transform: 'translate(-50%, -50%) scale(1)' },
+          { offset: .4, transform: 'translate(-50%, -61%) scale(1.09)' },
+          { ...finish, transform: 'translate(-50%, -50%) scale(1)' }
+        ], duration, signal, copy ? 'ease-in-out' : 'cubic-bezier(.24, .58, .28, 1)');
+
+        if (copy) {
+          await Promise.all([slide, animateEffect(from.gem, [
+            { transform: 'scale(1)', filter: 'brightness(1)' },
+            { offset: .29, transform: 'scale(1.15, 1.06)', filter: 'brightness(1.24)' },
+            { offset: .68, transform: 'scale(.94)', filter: 'brightness(1.06)' },
+            { transform: 'scale(1)', filter: 'brightness(1)' }
+          ], duration, signal)]);
+        } else {
+          await slide;
+        }
+        if (signal.aborted) return;
+
+        renderPiece(from, nextPosition[move.from]);
+        renderPiece(to, nextPosition[move.to]);
+        from.tile.removeAttribute('data-in-flight');
+        mover.remove();
+
+        if (move.kind === 'merge') {
+          await animateEffect(to.gem, [
+            { transform: 'scale(.88)', filter: 'brightness(1.25)' },
+            { offset: .52, transform: 'scale(1.15)', filter: 'brightness(1.32)' },
+            { transform: 'scale(1)', filter: 'brightness(1)' }
+          ], 145, signal);
+        }
+        if (signal.aborted || !captured.length) return;
+
+        await animateLightning(layer, move.to, captured, piece.side, signal);
+        if (!signal.aborted) await animateCaptures(captured, nextPosition, signal);
+      } finally {
+        signal.removeEventListener('abort', cleanup);
+        if (!signal.aborted) cleanup();
+      }
+    }
+
+    async function animateCaptures(captured, nextPosition, signal) {
+      const narrow = { transform: 'scale(.08, 1.1)', filter: 'brightness(1.55)' };
+      const resting = { transform: 'scale(1)', filter: 'brightness(1)' };
+      const targets = captured.map(index => cells[index]);
+      await Promise.all(targets.map(({ gem }) => animateEffect(gem, [resting, narrow], 85, signal, 'ease-in')));
+      if (signal.aborted) return;
+
+      for (const cell of targets) renderPiece(cell, nextPosition[cell.index]);
+      await Promise.all(targets.map(({ gem }) => animateEffect(gem, [
+        narrow,
+        { offset: .63, transform: 'scale(1.12, 1.04)', filter: 'brightness(1.23)' },
+        resting
+      ], 155, signal)));
+    }
+
+    function strokeBolt(context, points, progress, width, color) {
+      const visible = (points.length - 1) * progress;
+      context.beginPath();
+      context.moveTo(...points[0]);
+      for (let index = 1; index <= Math.ceil(visible); index += 1) {
+        const [x, y] = points[index - 1];
+        const [nextX, nextY] = points[index];
+        const fraction = Math.min(1, visible - index + 1);
+        context.lineTo(x + (nextX - x) * fraction, y + (nextY - y) * fraction);
+      }
+      context.shadowColor = color;
+      context.shadowBlur = width * 2.5;
+      context.lineWidth = width;
+      context.strokeStyle = color;
+      context.stroke();
+      context.shadowBlur = 0;
+      context.lineWidth = width * .42;
+      context.strokeStyle = '#fffbe9';
+      context.stroke();
+    }
+
+    function animateLightning(layer, source, targets, side, signal) {
+      const { clientWidth: width, clientHeight: height } = board;
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context || !width || !height) return;
+
+      const density = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.className = 'capture-lightning';
+      canvas.width = Math.round(width * density);
+      canvas.height = Math.round(height * density);
+      context.scale(density, density);
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      layer.append(canvas);
+
+      const color = getComputedStyle(board).getPropertyValue(side === AMBER ? '--amber' : '--mint').trim();
+      const lineWidth = Math.max(1.6, width / 175);
+      const { offsetLeft: x, offsetTop: y } = cells[source].tile;
+      const rays = targets.map((target, index) => {
+        const { offsetLeft: endX, offsetTop: endY } = cells[target].tile;
+        const dx = endX - x;
+        const dy = endY - y;
+        const direction = index % 2 ? -1 : 1;
+        const bends = [0, -.11, .09, -.13, .09, -.05, 0];
+        const path = bends.map((bend, step) => {
+          const along = step / (bends.length - 1);
+          return [x + dx * along - dy * bend * direction, y + dy * along + dx * bend * direction];
+        });
+        const [branchX, branchY] = path[3];
+        const branch = [
+          path[3],
+          [branchX + dx * .12 + dy * .15 * direction, branchY + dy * .12 - dx * .15 * direction],
+          [branchX + dx * .26 + dy * .12 * direction, branchY + dy * .26 - dx * .12 * direction]
+        ];
+        return { path, branch, endX, endY };
+      });
+
+      return new Promise(resolve => {
+        let frame;
+        let started;
+        const duration = 210;
+        const done = () => {
+          cancelAnimationFrame(frame);
+          signal.removeEventListener('abort', done);
+          canvas.remove();
+          resolve();
+        };
+        function draw(now) {
+          started ??= now;
+          const elapsed = now - started;
+          if (elapsed >= duration) {
+            done();
+            return;
+          }
+          const progress = Math.min(1, elapsed / 76);
+          context.clearRect(0, 0, width, height);
+          context.globalAlpha = Math.min(1, (duration - elapsed) / 115);
+          for (const { path, branch, endX, endY } of rays) {
+            strokeBolt(context, path, progress, lineWidth, color);
+            if (progress > .5) strokeBolt(context, branch, (progress - .5) * 2, lineWidth * .58, color);
+            if (progress === 1) {
+              context.beginPath();
+              context.arc(endX, endY, lineWidth * 1.35, 0, 2 * Math.PI);
+              context.fillStyle = '#fffbe9';
+              context.shadowColor = color;
+              context.shadowBlur = lineWidth * 3;
+              context.fill();
+            }
+          }
+          frame = requestAnimationFrame(draw);
+        }
+        signal.addEventListener('abort', done, { once: true });
+        frame = requestAnimationFrame(draw);
+      });
+    }
+
+    function focusCell(index) {
+      cells[focused].tile.tabIndex = -1;
+      focused = index;
+      cells[focused].tile.tabIndex = 0;
+    }
+
+    board.addEventListener('focusin', event => {
+      const tile = event.target.closest('.tile');
+      if (tile) focusCell(Number(tile.dataset.index));
+    });
+
+    board.addEventListener('click', event => {
+      const tile = event.target.closest('.tile');
+      if (!tile || activeMove || turn.end || isComputerTurn()) return;
+      const index = Number(tile.dataset.index);
+
+      if (selected !== null) {
+        const move = cells[selected].moves.find(({ to }) => to === index);
+        const kind = move && getMoveKind(position, move);
+        if (kind) {
+          play({ ...move, kind });
+          return;
+        }
+      }
+      if (index === selected) {
+        selected = null;
+        render();
+      } else if (position[index]?.side === turn.side && canMoveFrom(position, cells[index])) {
+        selected = index;
+        render();
+      }
+    });
+
+    board.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && selected !== null) {
+        selected = null;
+        render();
+        return;
+      }
+      const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+      if (!direction) return;
+      event.preventDefault();
+      const cell = cells[focused];
+      const [dx, dy] = direction;
+      const options = cells.filter(other => dy ? Math.sign(other.r - cell.r) === dy : other.r === cell.r && Math.sign(other.x - cell.x) === dx);
+      options.sort((a, b) => Math.abs(a.r - cell.r) - Math.abs(b.r - cell.r) || Math.abs(a.x - cell.x) - Math.abs(b.x - cell.x));
+      options[0]?.tile.focus();
+    });
+
+    document.querySelector('#restart').addEventListener('click', startGame);
+    variants.addEventListener('change', startGame);
+    mode.addEventListener('change', startGame);
+    reducedMotion.addEventListener?.('change', event => {
+      if (event.matches) activeMove?.abort();
+    });
+    startGame();
+  </script>
+</body>
+</html>
