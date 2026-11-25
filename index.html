@@ -417,7 +417,7 @@
       soundOutput = null;
     }
 
-    function playSound(voices, delay = 0) {
+    function playSound(voices, { delay = 0, detune = 0 } = {}) {
       if (!soundSwitch.checked || !AudioEngine) return;
       if (!audioContext) {
         try {
@@ -440,6 +440,7 @@
         const oscillator = audioContext.createOscillator();
         const envelope = audioContext.createGain();
         oscillator.type = waveform;
+        oscillator.detune.value = detune;
         oscillator.frequency.setValueAtTime(from, time);
         oscillator.frequency.exponentialRampToValueAtTime(to, end);
         envelope.gain.setValueAtTime(.0001, time);
@@ -606,12 +607,13 @@
     }
 
     async function play(move) {
+      const detune = position[move.from].side === MINT ? -500 : 0;
       const nextPosition = position.slice();
       const captured = applyMove(nextPosition, move);
       const movement = move.kind === 'copy' ? sounds.copy : sounds.jump;
       let resultDelay = captured.length ? 0 : .13;
       selected = null;
-      playSound(movement.start);
+      playSound(movement.start, { detune });
       if (!reducedMotion.matches && typeof board.animate === 'function') {
         const controller = new AbortController();
         activeMove = controller;
@@ -619,15 +621,15 @@
         render();
 
         try {
-          await animateMove(move, nextPosition, captured, controller.signal);
+          await animateMove(move, nextPosition, captured, controller.signal, detune);
         } catch (error) {
           if (!controller.signal.aborted) console.warn('Не удалось показать анимацию хода.', error);
         }
         if (activeMove !== controller) return;
         activeMove = null;
       } else {
-        playSound(movement.end, .11);
-        if (captured.length) playSound(sounds.lightning, .18);
+        playSound(movement.end, { delay: .11, detune });
+        if (captured.length) playSound(sounds.lightning, { delay: .18, detune });
         resultDelay = captured.length ? .33 : .23;
       }
 
@@ -640,7 +642,7 @@
         const [, amber, mint] = countPieces(position);
         const computerWon = mode.value === 'computer' && mint > amber;
         const result = amber === mint ? sounds.draw : computerWon ? sounds.loss : sounds.win;
-        playSound(result, resultDelay);
+        playSound(result, { delay: resultDelay });
       }
       if (isComputerTurn()) aiTimer = setTimeout(playComputer, 420);
     }
@@ -790,7 +792,7 @@
       });
     }
 
-    async function animateMove(move, nextPosition, captured, signal) {
+    async function animateMove(move, nextPosition, captured, signal, detune) {
       const from = cells[move.from];
       const to = cells[move.to];
       const copy = move.kind === 'copy';
@@ -843,7 +845,7 @@
         }
         if (signal.aborted) return;
 
-        playSound(copy ? sounds.copy.end : sounds.jump.end);
+        playSound(copy ? sounds.copy.end : sounds.jump.end, { detune });
         renderPiece(from, nextPosition[move.from]);
         renderPiece(to, nextPosition[move.to]);
         from.tile.removeAttribute('data-in-flight');
@@ -858,7 +860,7 @@
         }
         if (signal.aborted || !captured.length) return;
 
-        playSound(sounds.lightning);
+        playSound(sounds.lightning, { detune });
         await animateLightning(layer, move.to, captured, piece.side, signal);
         if (!signal.aborted) await animateCaptures(captured, nextPosition, signal);
       } finally {
